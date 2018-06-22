@@ -7,7 +7,7 @@ import commons
 class Button(object):
 	def __init__(self,position,data):
 		self.position=position
-		self.size=Vector2(100,40)
+		self.size=Vector2(data[4])
 		self.background=pygame.surface.Surface(self.size).convert()
 		self.background.fill((200,200,200))
 		self.content=data[1]
@@ -37,7 +37,7 @@ class Button(object):
 	def process(self):
 		if self.status and commons.flags[self.content]:
 			commons.set_world(self.content) #process the function it implies
-			#print(commons.current_statu)
+			#print(commons.current_state)
 			
 class Menu(object):
 	def __init__(self,button_data):
@@ -45,12 +45,16 @@ class Menu(object):
 		self.buttons={}
 		self.nums=len(button_data)		
 	def build_buttons(self):
-		height=self.nums*60
-		x=(commons.screen_size[0]-100)/2
+		height=self.nums*60		
 		y=(commons.screen_size[1]-height)/2
 		for i in range(self.nums):
-			position=(x,y+60*i)
+			if self.button_list[i][1]!='Back':
+				x=(commons.screen_size[0]-self.button_list[i][4][0])/2
+				position=Vector2(x,y+60*i)
+			else:
+				position=commons.screen_size-(20,20)-self.button_list[i][4]
 			self.buttons[self.button_list[i][1]]=Button(position,self.button_list[i])
+
 	def display(self,surface,cursor):
 		self.build_buttons()
 		for button in self.buttons.values():
@@ -61,8 +65,33 @@ class Menu(object):
 			if button.status:
 				button.process()
 
+class tip_window(Menu):
+	def __init__(self,button_data,font):
+		super().__init__(button_data)
+		self.size=Vector2(220,150)
+		self.background=pygame.surface.Surface(self.size).convert()
+		self.background.fill((255,255,255))
+		self.position=(commons.screen_size-self.size)/2
+		self.build_buttons()
+		self.font=font
+	def build_buttons(self):
+		for i in range(self.nums):			
+			position=self.position+(110*i+25,100)		
+			self.buttons[self.button_list[i][1]]=Button(position,self.button_list[i])
+	def display(self,surface,cursor):
+		surface.blit(self.background,self.position)
+		content=self.font.render('Are you sure?',True,(0,0,0))
+		pos=self.position+(self.size-content.get_size())/2-(0,20)
+		pygame.draw.rect(surface,(0,0,0),(self.position,self.size),2)
+		surface.blit(content,pos)
+		for button in self.buttons.values():
+			button.check(cursor)
+			button.display(surface)
+		
 	
 	
+	
+
 	
 	
 	

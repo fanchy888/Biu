@@ -6,7 +6,9 @@ from sys import exit
 from FSM import *
 import random
 import commons
-#story mode
+
+#the state of the game
+#story mode:each chapter includes a boss some enemies and a waiting period
 class pushing(State):
 	def __init__(self,world):
 		super().__init__('pushing')
@@ -23,7 +25,8 @@ class pushing(State):
 		self.world.time=0
 		self.world.change_chapter()
 		self.world.initial_enemy()
-		self.world.champ.fire=True		
+		self.world.champ.fire=True	
+#boss appears		
 class last_enemy(State):
 	def __init__(self,world):
 		super().__init__('boss')
@@ -48,24 +51,29 @@ class complete(State):
 		else:
 			return 'complete'
 	def start(self):
-		self.world.time=0
+		self.world.time=0 
 		self.world.bullets={}
 		self.world.clear=True
-		self.world.check_point=self.world.chapter_id+1
+		id=self.world.chapter_id+1
+		commons.flags[self.world.chapters[id].id]=True
+		if self.world.check_point<len(self.world.chapters)-2:
+			self.world.check_point=self.world.chapter_id+1
 	def stop(self):
 		self.world.chapter_id+=1
 		self.world.clear=False
+#complete all chapters and the ending script
 class congrats(State):
 	def __init__(self,world):
 		super().__init__('congrats')
 		self.world=world
 	def start(self):
 		self.world.time=0
-		commons.current_statu='End'	
 		self.world.champ.fire=False		
 		commons.flags['Endless']=True
+		commons.s_change=True
 	def check(self):
-		if self.world.time>=10:
+		if self.world.time>=25:
+			commons.s_change=True	
 			return 'gameover'
 		else:
 			return 'congrats'
@@ -75,17 +83,8 @@ class congrats(State):
 			self.world.champ.speed=0
 		else:
 			self.world.champ.speed+=0.5
-		
-			
-class gameover(State):
-	def __init__(self,world):
-		super().__init__('gameover')
-		self.world=world	
-	def start(self):
-		self.world.time=0
 
-
-#rank mode
+#endless mode:Never end
 class endless(State):
 	def __init__(self,world):
 		super().__init__('endless')
@@ -103,7 +102,16 @@ class endless(State):
 	def run(self):
 		self.world.generate_enemy()
 
-		
+#has nothing to do, maybe useful someday in future	
+class gameover(State):
+	def __init__(self,world):
+		super().__init__('gameover')
+		self.world=world	
+	def start(self):
+		self.world.time=0
+
+
+#entity, contains all game entities and all the game factors like chapter infos	
 class World(object):
 	def __init__(self,size,enemy_list,font):
 		self.size=size
@@ -132,6 +140,7 @@ class World(object):
 		self.FSM.add_state(gameover(self))
 		self.FSM.add_state(congrats(self))
 		self.check_point=0
+	#reset the world before a new game	
 	def reset(self):
 		self.FSM.change_state('gameover')
 		self.entities={}
@@ -141,6 +150,7 @@ class World(object):
 		self.entity_id=0
 		self.chapter_id=self.check_point
 		self.status=True
+	#add and delete the characters to the world
 	def add_champ(self,champ):
 		self.champ=champ
 	def add_entity(self,entity):
@@ -156,13 +166,15 @@ class World(object):
 	def change_chapter(self):
 		self.current_chapter=self.chapters[self.chapter_id]
 	def injert_boss(self):
-		boss_data=self.current_chapter.boss_data
+		boss_data=self.current_chapter.boss_data		
 		self.boss=Boss(self,boss_data)
 		self.add_entity(self.boss)
 	def delete_entity(self,id):
 		del self.entities[id]
 	def delete_bullet(self,id):
-		del self.bullets[id]	
+		del self.bullets[id]
+		
+	#like it says	
 	def process(self,time):
 		time_tick=time/1000.0
 		self.time+=time_tick
@@ -176,8 +188,7 @@ class World(object):
 				self.entities[key].process(time_tick)
 			for key in bullets.keys():
 				self.bullets[key].process(time_tick)			
-			self.FSM.think()
-			
+			self.FSM.think()		
 	def display(self,surface):
 		surface.blit(self.background,(0,0))
 		for entity in self.entities.values():
@@ -185,23 +196,25 @@ class World(object):
 		for bullet in self.bullets.values():
 			bullet.display(surface)
 		self.champ.display(surface)
+		#display the clearance messages
 		if self.clear:
-			message=self.font.render("chapter "+str(self.current_chapter.id)+" completed",True,(150,150,150))
+			message=self.font.render(str(self.current_chapter.id)+" completed",True,(150,150,150))
 			position=(self.size-message.get_size())/2
 			if (self.time%3>0.5):
 				surface.blit(message,position)
-			
-#enemy appears
+				
 	def generate_enemy(self):
 		for i in self.current_chapter.enemy:
 			id=i[0]
 			freq=i[1]
 			if self.enemy_freq[id]<=0:
 				y=0-self.enemy_list[id][0].get_height()
-				if self.current_chapter.id is not 'endless':
+				#story mode
+				if self.current_chapter.id is not 'Endless':
 					x=random.randint(0,self.size[0]-self.enemy_list[id][0].get_width())
 					position=Vector2(x,y)
 					self.add_entity(enemy(self,position,self.enemy_list[id]))
+				#endless mode
 				else:
 					num=int(self.size[0]/self.enemy_list[-1][0].get_width())
 					for i in range(num):
@@ -215,7 +228,8 @@ class World(object):
 		self.enemy_freq={}
 		for i in self.current_chapter.enemy:
 			self.enemy_freq[i[0]]=i[1]
-		
+
+#the main character			
 class Plane(object):
 	def __init__(self,world,data):
 		self.image=data[0]
@@ -238,22 +252,24 @@ class Plane(object):
 	def move(self,time):
 		self.position+=self.direction*self.speed*time
 	def check(self):
-	#check boundary
+		#check boundary
 		if (self.position[0]<=0 and self.direction==(-1,0)) or \
 		  (self.position[0]>=self.world.size[0]-self.image.get_width() and self.direction==(1,0)):
 			self.direction=Vector2(0,0)
-	#check hp
+		#check hp
 		if self.hp<=0:
 			self.hp=0
 			self.dead=True
-	#check exp
+		#check exp
 		if self.exp>=100*(self.level):
 			self.exp=0
 			self.Level_up()
+	#auto fire	
 	def Fire(self):
 		if self.fire and self.gun_cd<=0:
 			self.shoot()
 			self.gun_cd=0.2
+	#generate the bullets in the world
 	def shoot(self):
 		lenth=max(self.image.get_width()/self.guns,20)
 		fire_range=lenth*self.guns
@@ -263,6 +279,7 @@ class Plane(object):
 			gun_position=first_gun+(shift,0)
 			bullet=ammo(self.weapon_image,self.world,gun_position)
 			self.world.add_bullet(bullet)
+	#unfinished yet
 	def Level_up(self):
 		self.guns+=1
 		self.level+=1
@@ -273,13 +290,15 @@ class Plane(object):
 		self.gun_cd-=time
 	def display(self,surface):
 		surface.blit(self.image,self.position)
+	#reset to the default condition
 	def reset(self):
 		self.dead=False
 		self.fire=True
 		self.position=self.default[2]
 		self.hp=self.default[4]
 		self.speed=self.default[3]
-		
+
+#the ammo from the champ		
 class ammo(object):		
 	def __init__(self,image,world,position):
 		self.image=image
@@ -308,10 +327,10 @@ class ammo(object):
 				   self.position[0]<=enemy.position[0]+enemy.image.get_width() and \
 				   self.position[1]<=enemy.position[1]+enemy.image.get_height():
 					self.world.delete_bullet(self.id)
-					self.world.entities[enemy.id].hp-=self.damage
+					self.world.entities[enemy.id].hp=max(0,self.world.entities[enemy.id].hp-self.damage)
 					break
 	
-	
+# the enemy 	
 class enemy(object):
 	def __init__(self,world,position,data):
 		self.name='enemy'
@@ -349,6 +368,7 @@ class enemy(object):
 		self.check()
 		self.move(time)	
 
+#the boss of a chapter
 class Boss(object):
 	def __init__(self,world,data):
 		self.name='enemy'
@@ -390,7 +410,7 @@ class Boss(object):
 			self.gun_cd=1
 	def shoot(self):
 		x=self.position[0]+self.image.get_width()/2
-		y=self.position[1]
+		y=self.position[1]+self.image.get_height()
 		bullet=Enemy_ammo(self.weapon_image,self.world,Vector2(x,y))
 		self.world.add_bullet(bullet)
 	def process(self,time):
@@ -401,7 +421,7 @@ class Boss(object):
 	def display(self,surface):
 		surface.blit(self.image,self.position)	
 
-		
+#ammo from boss		
 class Enemy_ammo(ammo):
 	def __init__(self,image,world,position):
 		super().__init__(image,world,position)
@@ -427,7 +447,7 @@ class Enemy_ammo(ammo):
 			self.world.delete_bullet(self.id)
 			self.world.champ.hp-=self.damage
 
-			
+#endless mode enemy			
 class Brick(enemy):
 	def __init__(self,world,position,data):
 		super().__init__(world,position,data)
@@ -439,7 +459,7 @@ class Brick(enemy):
 		y=(self.image.get_height()-hp.get_height())/2		
 		surface.blit(hp,self.position+(x,y))
 			
-			
+# a chapter class			
 class Chapter(object):
 	def __init__(self,id,boss_data,time,enemy_data):
 		self.id=id
@@ -448,7 +468,7 @@ class Chapter(object):
 		self.boss_data=boss_data
 
 
-		
+#the panel show the infos of champs		
 class pannel(object):
 	def __init__(self,world,pannel_font,size):
 		self.size=size
@@ -463,11 +483,11 @@ class pannel(object):
 		score=self.font.render('Coins:'+str(self.world.champ.score),True,(0,0,0))
 		Hp=self.font.render('HP:'+str(self.world.champ.hp),True,(0,0,0))
 		Level=self.font.render('Level:'+str(self.world.champ.level),True,(0,0,0))
-		Stage=self.font.render('Chapter:'+str(self.world.current_chapter.id),True,(0,0,0))
+		Stage=self.font.render(str(self.world.current_chapter.id),True,(0,0,0))
 		surface.blit(Hp,self.position)
 		surface.blit(score,self.position+(220,0))		
 		surface.blit(Level,self.position+(0,50))
-		if self.world.current_chapter.id !='endless':
+		if self.world.current_chapter.id !='Endless':
 			surface.blit(Stage,self.position+(220,50))
 		exp_bar=self.position+(Level.get_width(),50)+(3,3)
 		pygame.draw.rect(surface,(0,0,0),(exp_bar,(80,20)),2)
