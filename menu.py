@@ -69,8 +69,8 @@ class tip_window(Menu):
 	def __init__(self,button_data,font):
 		super().__init__(button_data)
 		self.size=Vector2(220,150)
-		self.background=pygame.surface.Surface(self.size).convert()
-		self.background.fill((255,255,255))
+		self.background=pygame.surface.Surface(self.size).convert_alpha()
+		self.background.fill((255,255,255,50))
 		self.position=(commons.screen_size-self.size)/2
 		self.build_buttons()
 		self.font=font
@@ -89,9 +89,47 @@ class tip_window(Menu):
 			button.display(surface)
 		
 	
-	
-	
-
-	
-	
-	
+class pause_menu(Menu):
+	def __init__(self,button_data,font):
+		super().__init__(button_data)
+		self.size=Vector2(200,300)
+		self.background=pygame.surface.Surface(self.size).convert_alpha()
+		self.background.fill((255,255,255,10))
+		self.position=(commons.screen_size-self.size)/2
+		self.build_buttons()
+		self.font=font
+	def build_buttons(self):
+		for i in range(self.nums):
+			x=(self.size[0]-self.button_list[i][4][0])/2
+			y=50*i+100
+			position=self.position+(x,y)
+			self.buttons[self.button_list[i][1]]=Button(position,self.button_list[i])
+	def display(self,surface,cursor):
+		surface.blit(self.background,self.position)
+		content=self.font.render('Pause',True,(0,0,0))
+		pos=self.position+(self.size-content.get_size())/2-(0,100)
+		pygame.draw.rect(surface,(0,0,0),(self.position,self.size),2)
+		surface.blit(content,pos)
+		for button in self.buttons.values():
+			button.check(cursor)
+			button.display(surface)
+		
+class minibutton(Button):
+	def __init__(self,font):
+		self.content='OK'
+		self.status=False
+		self.size=Vector2(40,30)
+		self.text=font.render('OK',True,(0,0,0))
+		self.background=pygame.surface.Surface(self.size).convert()
+		self.background.fill((255,255,255))
+		self.position=(commons.screen_size-self.size)/2+(0,35)
+		
+	def display(self,surface,cursor):
+		super().check(cursor)
+		surface.blit(self.background,self.position)
+		surface.blit(self.text,self.position+(self.size-self.text.get_size())/2)
+		if self.status:
+			pygame.draw.rect(surface,(200,200,200),(self.position,self.size),2)
+	def process(self):
+		if self.status:
+			commons.set_world(self.content) 		
