@@ -29,6 +29,7 @@ gameover=pannel_font.render("GAME OVER",True,(0,0,0))
 
 
 info1=message_font.render("Congratulations!",True,(100,100,100))
+info1=pygame.image.load('data\\dafeiji.jpg').convert()	
 info3=font_guide.render("source code: https://github.com/fanchy888/Biu",True,(100,100,100))
 info2=logo_font.render("Work of Dr_Q",True,(100,100,100))
 guide1=font_guide.render("Press 'ESC' to go back to main menu",True,(0,0,0))
@@ -176,7 +177,7 @@ def run_end():
 		if position1[1]>=-info1.get_height():
 			screen.blit(info1,position1)		
 			position1+=Vector2(0,-1)*50*time/1000
-		position2[1]=max((commons.screen_size[1]-info2.get_height())/2,position1[1]+360)
+		position2[1]=max((commons.screen_size[1]-info2.get_height())/2,position1[1]+info1.get_height())
 		screen.blit(info2,position2)	
 		position3[1]=position2[1]+info2.get_height()+20	
 		screen.blit(info3,position3)		

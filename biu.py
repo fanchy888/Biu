@@ -79,7 +79,7 @@ class congrats(State):
 		commons.s_change=True
 		commons.user[2]=commons.user[5]*10+100
 	def check(self):
-		if self.world.time>=25:
+		if self.world.time>=50:
 			commons.s_change=True	
 			return 'gameover'
 		else:
@@ -225,13 +225,16 @@ class World(object):
 				#endless mode
 				else:
 					num=int(self.size[0]/self.enemy_list[-1][0].get_width())
+					temp=random.randint(0,4)
 					for i in range(num):
-						self.enemy_list[-1][2]=1+random.randint(int(self.time/10),int(self.time/10)+10)
+						self.enemy_list[-1][2]=1+random.randint(int(self.time/2),int(self.time/2)+10)						
+						if temp==i:
+							self.enemy_list[-1][2]=1+int(self.time/5)
 						self.enemy_list[-1][3]=self.enemy_list[-1][2]*2
 						x=0+i*self.enemy_list[-1][0].get_width()
 						position=Vector2(x,y)
 						self.add_entity(Brick(self,position,self.enemy_list[-1]))	
-						freq=self.current_chapter.enemy[0][1]-self.champ.level*0.44
+						freq=self.current_chapter.enemy[0][1]-self.champ.level*0.4
 				self.enemy_freq[id]=freq
 	def initial_enemy(self):
 		self.enemy_freq={}
