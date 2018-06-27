@@ -10,14 +10,12 @@ import commons
 from FSM import *
 
 
-
-
-
 #initialize
 screen=pygame.display.set_mode(commons.screen_size,0,32)
 pygame.display.set_caption('biu~~')
 clock=pygame.time.Clock()	
 pygame.init()
+
 
 font=pygame.font.SysFont("corbel",30)
 logo_font=pygame.font.SysFont("corbel",60)
@@ -86,15 +84,19 @@ world1=World(commons.world_size,enemy_list,message_font)
 plane1=Plane(world1,plane_data)
 world1.add_champ(plane1)
 pannel1=pannel(world1,pannel_font,commons.pannel_size)
+world1.add_pannel(pannel1)
 
 boss1=[boss_image1,boss_ammo_image1,50,100,50,1]
 boss2=[boss_image2,boss_ammo_image2,100,100,60,0.8]
 boss3=[boss_image3,boss_ammo_image3,150,100,70,0.7]
 
-chapter1=Chapter('Chapter 1',boss1,15,[(0,1)])
-chapter2=Chapter('Chapter 2',boss2,15,[(0,2),(1,1)])
-chapter3=Chapter('Chapter 3',boss3,15,[(2,1),(1,0.5),(0,2)])
-chapter_end=Chapter('Endless',None,-1,[(3,5)])
+bgm1='sounds\\chap1.wav'
+bgm2='sounds\\chap2.wav'
+bgm3='sounds\\chap3.wav'
+chapter1=Chapter('Chapter 1',bgm1,boss1,15,[(0,1)])
+chapter2=Chapter('Chapter 2',bgm2,boss2,15,[(0,2),(1,1)])
+chapter3=Chapter('Chapter 3',bgm3,boss3,15,[(2,1),(1,0.5),(0,2)])
+chapter_end=Chapter('Endless',None,None,-1,[(3,5)])
 
 world1.add_chapter(chapter1)
 world1.add_chapter(chapter2)
@@ -110,9 +112,8 @@ def retry():
 	game_FSM.change_state('menu')
 #restart from current chapter
 def reset():
-	global world1,plane1,pannel1,plane_data
+	global world1
 	world1.reset()
-	pannel1.reset()
 	commons.restart=False
 		
 def run_game():	
@@ -121,13 +122,13 @@ def run_game():
 			commons.isQuit=True		
 	press_key=pygame.key.get_pressed()	
 	if not press_key[K_LEFT] and not press_key[K_RIGHT]:		
-		world1.champ.direction=Vector2(0,0)
+		world1.champ.direction.x=0
 	if press_key[K_LEFT]:
-		world1.champ.direction=Vector2(-1,0)
+		world1.champ.direction.x=-1
 	if press_key[K_RIGHT]:
-		world1.champ.direction=Vector2(1,0)
+		world1.champ.direction.x=1
 	if press_key[K_RIGHT] and press_key[K_LEFT]:
-		world1.champ.direction=Vector2(0,0)
+		world1.champ.direction.x=0
 	if press_key[K_ESCAPE]:
 		commons.pause=True
 
@@ -168,21 +169,19 @@ def run_end():
 	if press_key[K_ESCAPE]:
 		commons.s_change=True
 	time=clock.tick()
-	world1.process(time)	
-	world1.display(screen)
-	if pannel1.position[1]<=commons.screen_size[1]:
-		pannel1.position+=Vector2(0,1)*time/1000*50
-		pannel1.display(screen)
-	else:
-		if position1[1]>=-info1.get_height():
-			screen.blit(info1,position1)		
-			position1+=Vector2(0,-1)*50*time/1000
-		position2[1]=max((commons.screen_size[1]-info2.get_height())/2,position1[1]+info1.get_height())
-		screen.blit(info2,position2)	
-		position3[1]=position2[1]+info2.get_height()+20	
-		screen.blit(info3,position3)		
-		if (world1.time%2<1.5):
-			screen.blit(guide1,commons.screen_size-guide1.get_size())
+	world1.process(time)
+	if world1.time>260:
+		commons.s_change=True
+	
+	if position1[1]>=-info1.get_height():
+		screen.blit(info1,position1)		
+		position1+=Vector2(0,-1)*50*time/1000
+	position2[1]=max((commons.screen_size[1]-info2.get_height())/2,position1[1]+info1.get_height())
+	screen.blit(info2,position2)	
+	position3[1]=position2[1]+info2.get_height()+20	
+	screen.blit(info3,position3)		
+	if (world1.time%2<1.5):
+		screen.blit(guide1,commons.screen_size-guide1.get_size())
 			
 def run_exit():
 	buttons=pygame.mouse.get_pressed()
@@ -231,9 +230,20 @@ class state_(object):
 		self.name=name
 		self.next=next
 	def start(self):
-		commons.s_change=False
+		commons.s_change=False		
 		if self.name=='game':
 			reset()
+			if commons.mode[0]=='pushing':
+				pass
+			else:
+				pygame.mixer.music.load('sounds\\endless.ogg')
+				pygame.mixer.music.play(-1,0.0)
+		if self.name=='end':
+			pygame.mixer.music.load('sounds\\end.mp3')
+			pygame.mixer.music.play(-1,0.0)
+		if self.name=='menu':
+			pygame.mixer.music.load('sounds\\happy.mp3')
+			pygame.mixer.music.play(-1,0.0)
 	def run(self):
 		mega_run(self.name)
 	def stop(self):
@@ -241,9 +251,10 @@ class state_(object):
 		if self.name=='end':					
 			commons.menu_id=0
 			global position1,position1,position3
-			position1=Vector2((commons.screen_size[0]-info1.get_width())/2,commons.screen_size[1])
-			position1=Vector2((commons.screen_size[0]-info2.get_width())/2,commons.screen_size[1])
-			position3=Vector2((commons.screen_size[0]-info3.get_width())/2,commons.screen_size[1])
+			position1[1]=commons.screen_size[1]
+			position2[1]=commons.screen_size[1]
+			position3[1]=commons.screen_size[1]
+		pygame.mixer.music.stop()
 	def check(self):
 		if commons.s_change:
 			return self.next
@@ -266,12 +277,6 @@ game_FSM.change_state('menu')
 
 
 
-
-
-
-		
-
-	
 while True:
 
 	if commons.isQuit:

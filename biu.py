@@ -23,9 +23,13 @@ class pushing(State):
 			self.world.generate_enemy()
 	def start(self):
 		self.world.time=0
+		self.world.status=False
 		self.world.change_chapter()
 		self.world.initial_enemy()
 		self.world.champ.fire=True	
+		bgm=self.world.current_chapter.bgm
+		pygame.mixer.music.load(bgm)
+		pygame.mixer.music.play(-1,0.0)
 #boss appears		
 class last_enemy(State):
 	def __init__(self,world):
@@ -56,17 +60,21 @@ class complete(State):
 		self.world.clear=True
 		id=commons.mode[1]+1
 		commons.flags[self.world.chapters[id].id]=True
+		pygame.mixer.music.stop()
+		pygame.mixer.music.load('sounds\\preview.ogg')
+		pygame.mixer.music.play()
 	def run(self):
 		commons.user[0]=self.world.champ.exp
 		commons.user[1]=self.world.champ.speed
 		commons.user[2]=self.world.champ.hp
-		commons.user[3]=self.world.champ.gun_cd
+		commons.user[3]=self.world.champ.init_guncd
 		commons.user[4]=self.world.champ.guns
 		commons.user[5]=self.world.champ.level
 		commons.user[6]=self.world.champ.score
 	def stop(self):
 		commons.mode[1]+=1
 		self.world.clear=False
+		pygame.mixer.music.stop()
 #complete all chapters and the ending script
 class congrats(State):
 	def __init__(self,world):
@@ -75,12 +83,11 @@ class congrats(State):
 	def start(self):
 		self.world.time=0
 		self.world.champ.fire=False		
+		self.world.champ.speed=200
 		commons.flags['Endless']=True
-		commons.s_change=True
-		commons.user[2]=commons.user[5]*10+100
+		commons.user[2]=commons.user[5]*10+100		
 	def check(self):
-		if self.world.time>=50:
-			commons.s_change=True	
+		if self.world.time>=3:
 			return 'gameover'
 		else:
 			return 'congrats'
@@ -90,7 +97,27 @@ class congrats(State):
 			self.world.champ.speed=0
 		else:
 			self.world.champ.speed+=0.5
-		
+		if self.world.pannel.position[1]<=commons.screen_size[1]:
+			self.world.pannel.speed=50
+		else:
+			self.world.pannel.speed=0
+	def stop(self):
+		self.world.status=True
+		self.world.time=0	
+		commons.s_change=True
+#the credits			
+class ending_script(State):
+	def __init__(self,world):
+		super().__init__('scripts')
+		self.world=world
+	def start(self):
+		pass
+	def check(self):
+		if self.world.time>=50:
+			commons.s_change=True
+			return 'gameover'
+		return 'scripts'
+	
 #endless mode:Never end
 class endless(State):
 	def __init__(self,world):
@@ -109,7 +136,7 @@ class endless(State):
 	def run(self):
 		self.world.generate_enemy()
 		commons.user[6]=self.world.champ.score
-#has nothing to do, maybe useful someday in future	
+#has nothing to do,keep idle
 class gameover(State):
 	def __init__(self,world):
 		super().__init__('gameover')
@@ -129,12 +156,12 @@ class World(object):
 		self.chapters=[]
 		self.bullet_id=0
 		self.entity_id=0
-		self.background=pygame.surface.Surface(size).convert()
+		self.background=pygame.surface.Surface(commons.screen_size).convert()
 		self.background.fill((200,255,255))
 		self.enemy_freq={}
 		self.enemy_list=enemy_list
 		self.boss=None
-		self.status=True #alive or dead
+		self.status=False #pass or not
 		self.FSM=FSM()
 		self.time=0
 		self.current_chapter=None
@@ -146,8 +173,10 @@ class World(object):
 		self.FSM.add_state(gameover(self))
 		self.FSM.add_state(congrats(self))
 		self.check_point=0
+		self.pannel=None
 	#reset the world before a new game	
 	def reset(self):
+		self.status=False
 		self.FSM.change_state(commons.mode[0])
 		self.entities={}
 		self.bullets={}
@@ -157,8 +186,11 @@ class World(object):
 			self.champ.reload()
 		self.bullet_id=0
 		self.entity_id=0
-		self.status=True
+		self.status=False
+		self.pannel.reset()
 	#add and delete the characters to the world
+	def add_pannel(self,pannel):
+		self.pannel=pannel
 	def add_champ(self,champ):
 		self.champ=champ
 	def add_entity(self,entity):
@@ -190,13 +222,14 @@ class World(object):
 			self.enemy_freq[i[0]]-=time_tick
 		entities=self.entities.copy()
 		bullets=self.bullets.copy()
-		if not self.champ.dead:
+		if not self.champ.dead and not self.status:
 			self.champ.process(time_tick)
 			for key in entities.keys():
 				self.entities[key].process(time_tick)
 			for key in bullets.keys():
 				self.bullets[key].process(time_tick)			
-			self.FSM.think()		
+			self.FSM.think()	
+		self.pannel.process(time_tick)
 	def display(self,surface):
 		surface.blit(self.background,(0,0))
 		for entity in self.entities.values():
@@ -210,7 +243,7 @@ class World(object):
 			position=(self.size-message.get_size())/2
 			if (self.time%3>0.5):
 				surface.blit(message,position)
-				
+		self.pannel.display(surface)		
 	def generate_enemy(self):
 		for i in self.current_chapter.enemy:
 			id=i[0]
@@ -227,14 +260,14 @@ class World(object):
 					num=int(self.size[0]/self.enemy_list[-1][0].get_width())
 					temp=random.randint(0,4)
 					for i in range(num):
-						self.enemy_list[-1][2]=1+random.randint(int(self.time/2),int(self.time/2)+10)						
+						self.enemy_list[-1][2]=1+random.randint(int(self.time/2.5),int(self.time/2.5)+10)						
 						if temp==i:
-							self.enemy_list[-1][2]=1+int(self.time/5)
-						self.enemy_list[-1][3]=self.enemy_list[-1][2]*2
+							self.enemy_list[-1][2]=1+int(self.time/8)
+						self.enemy_list[-1][3]=self.enemy_list[-1][2]*3
 						x=0+i*self.enemy_list[-1][0].get_width()
 						position=Vector2(x,y)
 						self.add_entity(Brick(self,position,self.enemy_list[-1]))	
-						freq=self.current_chapter.enemy[0][1]-self.champ.level*0.4
+						freq=self.current_chapter.enemy[0][1]-self.champ.level*0.3
 				self.enemy_freq[id]=freq
 	def initial_enemy(self):
 		self.enemy_freq={}
@@ -276,7 +309,7 @@ class Plane(object):
 	def Fire(self):
 		if self.fire and self.gun_cd<=0:
 			self.shoot()
-			self.gun_cd=0.2
+			self.gun_cd=self.init_guncd
 	#generate the bullets in the world
 	def shoot(self):
 		lenth=max(self.image.get_width()/self.guns,20)
@@ -291,9 +324,9 @@ class Plane(object):
 	def Level_up(self):		
 		self.level+=1
 		self.exp=0
-		self.speed=self.level*10+200
+		self.speed=self.level*20+200
 		self.hp+=10
-		self.gun_cd=0.2-self.level*0.01
+		self.init_guncd=self.init_guncd*0.9
 		self.guns=self.level//3+1		
 	def process(self,time):
 		self.check()
@@ -304,6 +337,7 @@ class Plane(object):
 		surface.blit(self.image,self.position)
 	#reload the user data after dead or exit
 	def reload(self):
+		self.direction=Vector2(0,0)
 		self.dead=False
 		self.fire=True
 		self.position=self.startpoint
@@ -312,16 +346,18 @@ class Plane(object):
 		self.exp=commons.user[0]
 		self.speed=commons.user[1]
 		self.hp=commons.user[2]
-		self.gun_cd=commons.user[3]
+		self.init_guncd=commons.user[3]
 		self.guns=commons.user[4]
 		self.level=commons.user[5]
 		self.score=commons.user[6]
+		self.gun_cd=self.init_guncd
 	#reset to initial state for endless mode
 	def reset(self):
+		self.direction=Vector2(0,0)
 		self.exp=0
 		self.speed=200
 		self.hp=100
-		self.gun_cd=0.2
+		self.init_guncd=0.2
 		self.guns=1
 		self.level=1
 		self.position=self.startpoint
@@ -338,6 +374,7 @@ class ammo(object):
 		self.id=0
 		self.name='biu'
 		self.damage=1
+
 	def move(self,time):
 		self.position+=self.speed*Vector2(0,-1)*time
 	def check(self):
@@ -369,8 +406,6 @@ class enemy(object):
 		self.world=world
 		self.image=data[0]
 		self.speed=data[1]#random.randint(data[1],data[1]+100)
-		#x=random.randint(0,world.size[0]-self.image.get_width())
-		#y=0-self.image.get_height()
 		self.position=position	
 		self.hp=data[2]
 		self.target=self.world.champ
@@ -456,7 +491,11 @@ class Boss(object):
 #ammo from boss		
 class Enemy_ammo(ammo):
 	def __init__(self,image,world,position):
-		super().__init__(image,world,position)
+		self.image=image
+		self.position=position
+		self.world=world
+		self.id=0
+		self.name='biu'
 		self.damage=10
 		self.speed=100
 	def move(self,time):
@@ -493,8 +532,9 @@ class Brick(enemy):
 			
 # a chapter class			
 class Chapter(object):
-	def __init__(self,id,boss_data,time,enemy_data):
+	def __init__(self,id,bgm,boss_data,time,enemy_data):
 		self.id=id
+		self.bgm=bgm
 		self.time=time
 		self.enemy=enemy_data
 		self.boss_data=boss_data
@@ -509,6 +549,9 @@ class pannel(object):
 		self.position=world.size-(world.size[0],0)
 		self.world=world
 		self.font=pannel_font
+		self.speed=0
+	def process(self,time):
+		self.position+=self.speed*time*Vector2(0,1)
 	def display(self,surface):
 		surface.blit(self.background,self.position)
 		pygame.draw.rect(surface,(0,0,0),(self.position,self.size),2)
@@ -529,4 +572,4 @@ class pannel(object):
 		pygame.draw.rect(surface,(0,0,0),(exp_bar,(self.world.champ.exp/self.world.champ.level*80/100,20)),0)
 	def reset(self):
 		self.position=self.world.size-(self.world.size[0],0)
-	
+		self.speed=0

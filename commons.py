@@ -16,6 +16,8 @@ pause=False
 restart=False
 giveup=False
 isDead=False
+
+
 mode=['gameover',0]
 flags={}
 flags['Start']=True
